@@ -139,32 +139,25 @@ table.xl tr.bad td{background:#fff1f2}
 <div id="dls"></div>
 
 <script>
+/* Báo lỗi thay vì trang trắng: nếu mã app không chạy được (thường do dán sai cấu hình Firebase) */
+(function(){var bad='';window.addEventListener('error',function(e){bad=bad||(e.message||'')+(e.lineno?' (dòng '+e.lineno+')':'');});
+setTimeout(function(){var l=document.getElementById('login'),a=document.getElementById('app');if(window.TVH_STARTED||!l||!a||!l.hidden||!a.hidden)return;
+l.hidden=false;l.innerHTML='<div class="card"><h1>Không chạy được app</h1><p>Mã trong <b>index.html</b> bị lỗi, thường do dán sai cấu hình Firebase.</p><p>Trong dòng <code>const FIREBASE_CONFIG = …;</code> chỉ được có phần <code>{ apiKey: …, appId: … }</code>, không dán các dòng <code>import</code>, <code>const firebaseConfig</code>, <code>initializeApp</code>.</p>'+(bad?'<p class="sm mut">Chi tiết: '+bad.replace(/</g,'&lt;')+'</p>':'')+'</div>';},6000);})();
+</script>
+<script>
 /* ======================= CẤU HÌNH =======================
    Dán cấu hình Firebase (Firebase Console → ⚙ Cài đặt dự án → Ứng dụng của bạn → Cấu hình SDK)
    vào giữa hai dấu ngoặc nhọn, ví dụ:
    const FIREBASE_CONFIG = { apiKey: "AIza...", authDomain: "hoichan-tvh.firebaseapp.com", projectId: "hoichan-tvh",
                              storageBucket: "...", messagingSenderId: "...", appId: "..." };            */
-const FIREBASE_CONFIG = {// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
+const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBiROSyokf-QaUXaq4LfMJiTpx14uGbZ6A",
   authDomain: "hoichanngoaie-bvk.firebaseapp.com",
   projectId: "hoichanngoaie-bvk",
   storageBucket: "hoichanngoaie-bvk.firebasestorage.app",
   messagingSenderId: "953559446561",
-  appId: "1:953559446561:web:febf12cacd244310331f60",
-  measurementId: "G-ZR3GMX0HX6"
+  appId: "1:953559446561:web:febf12cacd244310331f60"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);};
 const XL_KHOA = 'KHOA NGOẠI PHỤ KHOA';          // dòng tiêu đề file Excel KHTH
 /* ======================================================= */
 
@@ -1317,6 +1310,7 @@ async function backup(){
 
 /* ---------------- khởi động ---------------- */
 async function start(){
+  window.TVH_STARTED=1;
   if(window.DEMO_READY) await window.DEMO_READY;
   DB=window.MEM_DB||FireDB;
   try{ const u=localStorage.getItem('tvh_user'); if(u) $('#lgU').value=u; }catch(e){}
