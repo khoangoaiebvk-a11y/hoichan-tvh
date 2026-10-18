@@ -33,6 +33,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #94cfcf;border-color:v
 .btn.sec{background:var(--pri2);color:var(--pri)}
 .btn.warn{background:#fef3c7;color:var(--amb)}
 .btn.danger{background:#fee2e2;color:var(--red)}
+.warnbox{background:#fef2f2;border:1px solid #fecaca;color:#7f1d1d;border-radius:8px;padding:8px 10px;font-size:13px}
 .btn.sm{padding:4px 9px;font-size:12.5px}
 .btn:disabled{opacity:.55;cursor:default}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -49,7 +50,9 @@ th{background:#f7fafc;font-size:12.5px;color:var(--mut);font-weight:600;white-sp
 tbody tr:hover{background:#fafcfd}
 td.act{text-align:right;min-width:96px}
 td.act .btn{margin:2px 0 2px 3px}
-td.act.many{min-width:178px;max-width:200px}
+td.act.many{min-width:0}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:3px;width:176px;margin-left:auto}
+.acts .btn{margin:0!important;width:100%;padding-left:4px;padding-right:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11.5px;white-space:nowrap;background:#eef2f7}
 .t0{background:#fef3c7;color:#92400e}.t1{background:#dbeafe;color:#1e40af}.t2{background:#dcfce7;color:#166534}.t3{background:#e5e7eb;color:#374151}.t5{background:#f1f5f9;color:#64748b}.tr{background:#fee2e2;color:#991b1b;font-weight:600}
 .myc{background:#fee2e2;color:#b91c1c;font-weight:700}
@@ -171,10 +174,10 @@ const ROLE_LBL = {admin:'Quản trị viên', hoichan:'Phụ trách hội chẩn
 const LM_ACTIVE = ['Dự kiến','Đã xác nhận'];
 const LM_FINAL = ['Đã thực hiện','Hoãn','Hủy'];
 const LM_STATUS = LM_ACTIVE.concat(LM_FINAL);
-const KET_THUC = ['Ra viện','Chuyển khoa','Không phẫu thuật'];
+const KET_THUC = ['Ra viện','Chuyển khoa','Xin về','Điều trị khác','Không phẫu thuật','Khác'];
 const BN_HC = ['maDT','hoTen','namSinh','baoHiem','buong','chanDoan','noiGioiThieu','diaChi','sdt','ngayVaoVien','bsPhuTrach','myc','ghiChu'];
 const BN_IMPORT = ['maDT','hoTen','namSinh','baoHiem','buong','chanDoan','noiGioiThieu','diaChi','sdt','ngayVaoVien'];
-const BN_TD = ['lyDoCho','tienDo','ketThuc'];
+const BN_TD = ['lyDoCho','tienDo','ketThuc','ketThucGhiChu'];
 const HC_F = ['ngayHC','chanDoanXD','ketLuan','phuongAnDT','phuongAnPT','xnBoSung','yKienCK','congViec','nguoiPhuTrach','hanHoanThanh'];
 const HC_SUM = ['ngayHC','chanDoanXD','ketLuan','phuongAnDT','phuongAnPT','congViec','nguoiPhuTrach','hanHoanThanh'];
 const LM_F = ['maBA','ngayMo','cachThucMo','duongMo','ptvChinh','kipMe','loaiMo','ghiChu'];
@@ -283,7 +286,7 @@ async function L_saveDM(dm){
 }
 
 /* ---- bệnh nhân ---- */
-function newBnDoc(id,now){ return {id,maDT:'',hoTen:'',namSinh:'',baoHiem:'',buong:'',chanDoan:'',noiGioiThieu:'',diaChi:'',sdt:'',ngayVaoVien:'',bsPhuTrach:'',myc:'',ghiChu:'',lyDoCho:'',tienDo:'',ketThuc:'',ngayKetThuc:'',tenKhongDau:'',hoatDong:true,ngayRoi:'',lichHieuLuc:'',hcCuoi:null,daMo:'',ngayTao:now,nguoiTao:ME.u,capNhat:now,nguoiCapNhat:ME.u}; }
+function newBnDoc(id,now){ return {id,maDT:'',hoTen:'',namSinh:'',baoHiem:'',buong:'',chanDoan:'',noiGioiThieu:'',diaChi:'',sdt:'',ngayVaoVien:'',bsPhuTrach:'',myc:'',ghiChu:'',lyDoCho:'',tienDo:'',ketThuc:'',ketThucGhiChu:'',ngayKetThuc:'',tenKhongDau:'',hoatDong:true,ngayRoi:'',lichHieuLuc:'',hcCuoi:null,daMo:'',ngayTao:now,nguoiTao:ME.u,capNhat:now,nguoiCapNhat:ME.u}; }
 async function L_saveBN(orig,v,op){
   op=op||{}; needRole('admin','hoichan','nhaplieu');
   const isNew=!orig, fields=BN_HC.concat(ME.role==='nhaplieu'?[]:BN_TD), patch={};
@@ -292,6 +295,7 @@ async function L_saveBN(orig,v,op){
   if(!name) throw new Error('Thiếu họ tên bệnh nhân');
   if(patch.ngayVaoVien&&!isDate(patch.ngayVaoVien)) throw new Error('Ngày vào viện không hợp lệ');
   if(patch.ketThuc&&!KET_THUC.includes(patch.ketThuc)) throw new Error('Trạng thái kết thúc không hợp lệ');
+  const ngKT=isDate(v.ngayKetThuc)&&v.ngayKetThuc<=today()?v.ngayKetThuc:today();
   if(!isNew&&!Object.keys(patch).length) return {bn:orig};
   if('hoTen' in patch) patch.tenKhongDau=norm(patch.hoTen);
   const oldDT=isNew?'':str(orig.maDT), newDT=('maDT' in patch)?patch.maDT:oldDT;
@@ -300,10 +304,10 @@ async function L_saveBN(orig,v,op){
   const id=isNew?idOf(op,'bn',newBnId):orig.id;
   if(isNew){
     doc=Object.assign(newBnDoc(id,now),patch);
-    if(doc.ketThuc){ doc.ngayKetThuc=today(); doc.hoatDong=false; doc.ngayRoi=today(); }
+    if(doc.ketThuc){ doc.ngayKetThuc=ngKT; doc.hoatDong=false; doc.ngayRoi=today(); }
     ops.push({t:'set',c:'benhnhan',id,d:doc});
   } else {
-    if('ketThuc' in patch){ patch.ngayKetThuc=patch.ketThuc?today():''; const a=activeOf(Object.assign({},orig,patch)); if(a!==orig.hoatDong){ patch.hoatDong=a; patch.ngayRoi=a?'':today(); } }
+    if('ketThuc' in patch){ patch.ngayKetThuc=patch.ketThuc?ngKT:''; if(!patch.ketThuc) patch.ketThucGhiChu=''; const a=activeOf(Object.assign({},orig,patch)); if(a!==orig.hoatDong){ patch.hoatDong=a; patch.ngayRoi=a?'':today(); } }
     patch.capNhat=now; patch.nguoiCapNhat=ME.u;
     ops.push({t:'update',c:'benhnhan',id,d:patch}); doc=Object.assign({},orig,patch);
   }
@@ -438,6 +442,21 @@ async function L_search(q){
   await Promise.all(tasks);
   return {bn:Object.values(bn),lm:Object.values(lm)};
 }
+// Xóa hẳn một bệnh nhân (nhập nhầm, trùng): xóa cả hội chẩn, lịch mổ, chỉ mục MÃ ĐT; nhật ký giữ dấu vết
+async function L_deleteBN(p,reason){
+  needRole('admin','hoichan','nhaplieu'); reason=str(reason);
+  if(!reason) throw new Error('Cần ghi lý do xóa');
+  if(ME.role==='nhaplieu'&&!delSimple(p)) throw new Error('Bệnh nhân đã có hội chẩn hoặc lịch mổ – nhờ người phụ trách hội chẩn xóa');
+  const [hc,lm,ix]=await Promise.all([DB.query('hoichan',[['bnId','==',p.id]]),DB.query('lichmo',[['bnId','==',p.id]]),p.maDT?DB.get('idx_madt',dtKey(p.maDT)):null]);
+  const ops=[{t:'delete',c:'benhnhan',id:p.id}];
+  if(ix&&ix.bnId===p.id) ops.push({t:'delete',c:'idx_madt',id:dtKey(p.maDT)});
+  hc.forEach(h=>ops.push({t:'delete',c:'hoichan',id:h.id})); lm.forEach(l=>ops.push({t:'delete',c:'lichmo',id:l.id}));
+  ops.push(logOp({},'Xóa bệnh nhân','benhnhan',p.id,p.hoTen+(p.maDT?' – MÃ ĐT '+p.maDT:'')+' – lý do: '+reason+' – kèm '+hc.length+' hội chẩn, '+lm.length+' lịch mổ'));
+  await DB.commit(ops);
+  return {hc:hc.length,lm:lm.length};
+}
+const delSimple=p=>!p.hcCuoi&&!p.lichHieuLuc&&!p.daMo;   // BN mới nhập, chưa hội chẩn / lịch mổ
+async function L_loadKetThuc(from){ return DB.query('benhnhan',[['ngayKetThuc','>=',from]]); }
 async function L_history(bnId){
   const [hc,lm]=await Promise.all([DB.query('hoichan',[['bnId','==',bnId]]),DB.query('lichmo',[['bnId','==',bnId]])]);
   return {hc,lm};
@@ -601,10 +620,12 @@ const cdLich=p=>cdXD(p)||p.chanDoan||'';      // lịch mổ / KHTH: chẩn đo�
 const cdHTML=p=>cdXD(p)?esc(cdXD(p)):(p.chanDoan?esc(p.chanDoan)+' <span class="sm amb">(CĐ vào viện)</span>':'');
 const nsHTML=p=>esc(p.namSinh)+(tuoi(p.namSinh)?` <span class="mut">(${tuoi(p.namSinh)}t)</span>`:'');
 const ngayNam=p=>p.ngayVaoVien?Math.max(0,days(p.ngayVaoVien,today())):'';
+const canDel=p=>!!p&&(can('hc')||(ME.role==='nhaplieu'&&delSimple(p)));
+const delBtn=id=>canDel(S.bn[id])?`<button class="btn danger sm" title="Xóa bệnh nhân nhập sai" onclick="openDelBN('${id}')">Xóa BN</button>`:'';
 const lmOf=id=>S.lm.filter(l=>l.bnId===id).sort((a,b)=>(b.ngayMo||'').localeCompare(a.ngayMo||'')||(b.ngayTao||'').localeCompare(a.ngayTao||''));
 
 /* ---------------- khung trang ---------------- */
-const TABS=[['tong','Tổng quan'],['nhap','Nhập bệnh nhân'],['cho','Chờ hội chẩn'],['theodoi','Theo dõi sau hội chẩn'],['lich','Lịch phẫu thuật'],['quangay','Lịch mổ quá ngày'],['tim','Tìm kiếm & xuất Excel'],['qt','Quản trị']];
+const TABS=[['tong','Tổng quan'],['nhap','Nhập bệnh nhân'],['cho','Chờ hội chẩn'],['theodoi','Theo dõi sau hội chẩn'],['lich','Lịch phẫu thuật'],['quangay','Lịch mổ quá ngày'],['khongmo','Không mổ / Ra viện'],['tim','Tìm kiếm & xuất Excel'],['qt','Quản trị']];
 function counts(){
   const c={cho:0,theodoi:0,quangay:0,homnay:0}, T=today();
   for(const id in S.d){const s=S.d[id].st; if(s in c) c[s]++;}
@@ -619,10 +640,10 @@ function render(){
     const n=c[k]; const lbl=k==='qt'&&!can('admin')?'Tài khoản':l;
     return `<button class="${S.tab===k?'on':''}" onclick="go('${k}')">${lbl}${n?`<span class="n${k==='quangay'?' r':''}">${n}</span>`:''}</button>`;
   }).join('');
-  const V={tong:vTong,nhap:vNhap,cho:vCho,theodoi:vTheoDoi,lich:vLich,quangay:vQuaNgay,tim:vTim,qt:vQT};
+  const V={khongmo:vKhongMo,tong:vTong,nhap:vNhap,cho:vCho,theodoi:vTheoDoi,lich:vLich,quangay:vQuaNgay,tim:vTim,qt:vQT};
   $('#main').innerHTML=V[S.tab]();
-  if(['cho','theodoi','quangay','tim','lich'].includes(S.tab)) fill(S.tab);
-  if(S.tab==='nhap'){ drawGrid(); drawImp(); }
+  if(['cho','theodoi','quangay','tim','lich','khongmo'].includes(S.tab)) fill(S.tab);
+  if(S.tab==='nhap'){ drawGrid(); drawImp(); fill('nhapgan'); }
   if(S.tab==='qt'&&can('admin')) loadUsers();
 }
 function refresh(){ if($('#app').hidden||!ME) return; const a=document.activeElement; const keep=a&&a.id&&$('#main').contains(a)?a.id:null; render(); if(keep&&document.getElementById(keep)) document.getElementById(keep).focus(); }
@@ -631,7 +652,7 @@ function refresh(){ if($('#app').hidden||!ME) return; const a=document.activeEle
 function table(rows,cols,actions,offset){
   if(!rows.length) return '<p class="mut">Không có dữ liệu.</p>';
   return `<div class="tw"><table><thead><tr><th>STT</th>${cols.map(c=>`<th>${c.h}</th>`).join('')}${actions?'<th class="noprint"></th>':''}</tr></thead><tbody>${
-    rows.map((r,i)=>{ const a=actions?actions(r):''; return `<tr><td>${(offset||0)+i+1}</td>${cols.map(c=>`<td${c.w?` style="min-width:${c.w}px"`:''}>${c.f(r)}</td>`).join('')}${actions?`<td class="act${(a.match(/<button/g)||[]).length>2?' many':''}">${a}</td>`:''}</tr>`; }).join('')
+    rows.map((r,i)=>{ const a=actions?actions(r):''; return `<tr><td>${(offset||0)+i+1}</td>${cols.map(c=>`<td${c.w?` style="min-width:${c.w}px"`:''}>${c.f(r)}</td>`).join('')}${actions?`<td class="act${(a.match(/<button/g)||[]).length>2?' many':''}">${(a.match(/<button/g)||[]).length>2?'<div class="acts">'+a+'</div>':a}</td>`:''}</tr>`; }).join('')
   }</tbody></table></div>`;
 }
 function paged(key,rows,cols,actions){
@@ -687,19 +708,29 @@ const C={
 const LISTS={
   cho:{rows:()=>Object.values(S.bn).filter(p=>S.d[p.id].st==='cho'&&passBN('cho',p)).sort(byVV),
        cols:[C.maDT,C.ten,C.ns,C.buong,C.vv,C.nn,C.cd,C.bs,C.st],
-       act:p=>`<button class="btn sec sm" onclick="openHS('${p.id}')">Hồ sơ</button>`+(can('hc')?`<button class="btn sm" onclick="openHC('${p.id}')">Hội chẩn</button>`:''),
+       act:p=>`<button class="btn sec sm" onclick="openHS('${p.id}')">Hồ sơ</button>`+(can('hc')?`<button class="btn sm" onclick="openHC('${p.id}')">Hội chẩn</button><button class="btn warn sm" onclick="openKT('${p.id}')">Không mổ</button>`:'')+delBtn(p.id),
        xl:{title:'DANH SÁCH BỆNH NHÂN CHỜ HỘI CHẨN',cols:[C.maDT,C.ten,C.ns,C.bh,C.buong,C.vv,C.nn,C.cd,C.bs,C.noi,C.sdt,{h:'Ghi chú',x:p=>[p.myc,p.ghiChu].filter(Boolean).join(', ')}],file:'Cho_hoi_chan'}},
   theodoi:{rows:()=>Object.values(S.bn).filter(p=>S.d[p.id].st==='theodoi'&&passBN('theodoi',p)).sort(byVV),
        cols:[C.maDT,C.ten,C.ns,C.buong,C.vv,C.nn,C.cdxd,C.hc,C.lydo,C.tiendo,C.viec],
-       act:p=>`<button class="btn sec sm" onclick="openHS('${p.id}')">Hồ sơ</button>`+(can('hc')?`<button class="btn sec sm" onclick="openTD('${p.id}')">Cập nhật</button><button class="btn sec sm" onclick="openHC('${p.id}')">Hội chẩn lại</button><button class="btn sm" onclick="openLM('${p.id}')">Lập lịch mổ</button>`:''),
+       act:p=>`<button class="btn sec sm" onclick="openHS('${p.id}')">Hồ sơ</button>`+(can('hc')?`<button class="btn sec sm" onclick="openTD('${p.id}')">Cập nhật</button><button class="btn sec sm" onclick="openHC('${p.id}')">Hội chẩn lại</button><button class="btn sm" onclick="openLM('${p.id}')">Lập lịch mổ</button><button class="btn warn sm" onclick="openKT('${p.id}')">Không mổ</button>`:'')+delBtn(p.id),
        xl:{title:'DANH SÁCH BỆNH NHÂN ĐÃ HỘI CHẨN – CHƯA CÓ LỊCH MỔ',cols:[C.maDT,C.ten,C.ns,C.buong,C.vv,C.nn,C.cd,C.cdxd,C.hc,{h:'Phương án PT dự kiến',x:p=>(p.hcCuoi||{}).phuongAnPT||''},C.lydo,C.tiendo,C.viec],file:'Cho_lich_mo'}},
   quangay:{rows:()=>S.lm.filter(l=>l.hieuLuc&&l.ngayMo<today()&&S.bn[l.bnId]&&passBN('quangay',S.bn[l.bnId])).sort((a,b)=>a.ngayMo.localeCompare(b.ngayMo)),
        cols:[{h:'Ngày mổ dự kiến',f:l=>`<b>${vn(l.ngayMo)}</b>`,x:l=>vn(l.ngayMo)},{h:'Quá',f:l=>`<span class="red">${days(l.ngayMo,today())} ngày</span>`,x:l=>days(l.ngayMo,today())},
              {h:'Mã BA',f:l=>esc(l.maBA),x:l=>l.maBA},{h:'Họ và tên',f:l=>nameHTML(S.bn[l.bnId]),x:l=>S.bn[l.bnId].hoTen},{h:'Năm sinh',f:l=>nsHTML(S.bn[l.bnId]),x:l=>S.bn[l.bnId].namSinh},
              {h:'Chẩn đoán',f:l=>cdHTML(S.bn[l.bnId]),x:l=>cdLich(S.bn[l.bnId])},{h:'Cách thức mổ',f:l=>esc(l.cachThucMo),x:l=>l.cachThucMo},{h:'BS mổ chính',f:l=>esc(kipStr(l)),x:kipStr},{h:'Trạng thái',f:lmTag,x:lmLabel}],
-       act:l=>`<button class="btn sec sm" onclick="openHS('${l.bnId}')">Hồ sơ</button>`+(can('hc')?`<button class="btn sm" onclick="openKQ('${l.id}')">Xác nhận kết quả</button><button class="btn sec sm" onclick="openLM('${l.bnId}','${l.id}')">Đổi ngày</button><button class="btn warn sm" onclick="openHoan('${l.id}','Hoãn')">Hoãn</button>`:''),
+       act:l=>`<button class="btn sec sm" onclick="openHS('${l.bnId}')">Hồ sơ</button>`+(can('hc')?`<button class="btn sm" onclick="openKQ('${l.id}')">Xác nhận kết quả</button><button class="btn sec sm" onclick="openLM('${l.bnId}','${l.id}')">Đổi ngày</button><button class="btn warn sm" onclick="openHoan('${l.id}','Hoãn')">Hoãn</button>`:'')+delBtn(l.bnId),
        xl:{title:'LỊCH MỔ QUÁ NGÀY – CHƯA XÁC NHẬN KẾT QUẢ',file:'Lich_qua_ngay'}}
 };
+LISTS.khongmo={rows:()=>{const f=F('khongmo'); return Object.values(S.bn).filter(p=>p.ketThuc&&!p.daMo&&(!f.kfrom||(p.ngayKetThuc||'')>=f.kfrom)&&(!f.kto||(p.ngayKetThuc||'')<=f.kto)&&(!f.loai||p.ketThuc===f.loai)&&passBN('khongmo',p)).sort((a,b)=>(b.ngayKetThuc||'').localeCompare(a.ngayKetThuc||''))},
+  cols:[{h:'Ngày',f:p=>`<b>${vn(p.ngayKetThuc)}</b>`,x:p=>vn(p.ngayKetThuc)},{h:'Hình thức',f:p=>`<span class="tag ${KT_CLS[p.ketThuc]||'t5'}">${esc(p.ketThuc)}</span>`,x:p=>p.ketThuc},{h:'Chi tiết (nơi chuyển / điều trị)',w:160,f:p=>esc(p.ketThucGhiChu),x:p=>p.ketThucGhiChu},C.maDT,C.ten,C.ns,C.vv,C.cd,C.cdxd],
+  act:p=>`<button class="btn sec sm" onclick="openHS('${p.id}')">Hồ sơ</button>`+(can('hc')?`<button class="btn sec sm" onclick="reopenBN('${p.id}',this)">Mở lại</button>`:'')+delBtn(p.id),
+  xl:{title:'DANH SÁCH BỆNH NHÂN KHÔNG MỔ – CHUYỂN KHOA / RA VIỆN / XIN VỀ / ĐIỀU TRỊ KHÁC',file:'Khong_mo_ra_vien'}};
+LISTS.nhapgan={rows:()=>{const lim=addDays(today(),-7); return Object.values(S.bn).filter(p=>(p.ngayTao||'')>=lim&&passBN('nhapgan',p)).sort((a,b)=>(b.ngayTao||'').localeCompare(a.ngayTao||''))},
+  cols:[{h:'Lúc nhập',f:p=>`<span class="sm">${esc(p.ngayTao)}</span>`,x:p=>p.ngayTao},C.maDT,C.ten,C.ns,C.buong,C.vv,C.cd,C.st,{h:'Người nhập',f:p=>`<span class="sm mut">${esc(p.nguoiTao)}</span>`,x:p=>p.nguoiTao}],
+  act:p=>`<button class="btn sec sm" onclick="openHS('${p.id}')">Hồ sơ / sửa</button>`+delBtn(p.id),
+  xl:{title:'BỆNH NHÂN NHẬP TRONG 7 NGÀY',file:'BN_nhap_7_ngay'}};
+LISTS.khongmo.xl.cols=LISTS.khongmo.cols.concat([C.bh,C.buong,C.bs,C.sdt,{h:'Người cập nhật',x:p=>p.nguoiCapNhat}]);
+const KT_CLS={'Ra viện':'t3','Chuyển khoa':'t1','Xin về':'t0','Điều trị khác':'t2','Không phẫu thuật':'t5','Khác':'t5'};
 LISTS.quangay.xl.cols=LISTS.quangay.cols.concat([{h:'Kíp mê',x:l=>l.kipMe},{h:'P/S',x:l=>l.loaiMo},{h:'Mã ĐT',x:l=>S.bn[l.bnId].maDT}]);
 function fill(key){
   const el=$('#L_'+key); if(!el) return;
@@ -723,6 +754,28 @@ function vTong(){
   <div class="card"><div class="row between"><h2>Mổ hôm nay – ${thu(T)}, ${vn(T)}</h2><button class="btn sec sm noprint" onclick="xlKHTH('${T}','${T}')">Xuất KHTH</button></div>${table(lmDay(T),cols,l=>`<button class="btn sec sm" onclick="openHS('${l.bnId}')">Hồ sơ</button>`)}</div>
   <div class="card"><div class="row between"><h2>Mổ ngày mai – ${thu(T1)}, ${vn(T1)}</h2><button class="btn sec sm noprint" onclick="xlKHTH('${T1}','${T1}')">Xuất KHTH</button></div>${table(lmDay(T1),cols,l=>`<button class="btn sec sm" onclick="openHS('${l.bnId}')">Hồ sơ</button>`)}</div>
   <div class="card"><h2>Việc sau hội chẩn đến hạn (đến ngày mai)</h2>${table(viec,[C.maDT,C.ten,C.buong,C.viec,C.lydo],p=>`<button class="btn sec sm" onclick="openHS('${p.id}')">Hồ sơ</button>`)}</div>`;
+}
+function vKhongMo(){
+  const f=F('khongmo'); if(f.kfrom===undefined){ f.kfrom=addDays(today(),-30); f.kto=today(); }
+  const cutoff=addDays(today(),-KEEP_DAYS);
+  return `<div class="card"><div class="row between"><h2>Không mổ – chuyển khoa / ra viện / xin về / điều trị khác</h2><div class="row noprint"><button class="btn sec sm" onclick="xlList('khongmo')">Xuất Excel</button><button class="btn sec sm" onclick="window.print()">In</button></div></div>
+   <p class="mut sm" style="margin:4px 0 0">Bệnh nhân kết thúc điều trị tại khoa mà không phẫu thuật. Ghi từ nút <b>Không mổ</b> ở danh sách Chờ hội chẩn / Theo dõi, hoặc trong Hồ sơ. Bấm <b>Mở lại</b> nếu bệnh nhân quay lại danh sách chờ.</p>
+   <div class="filters noprint"><div class="q"><label>Tìm nhanh</label><input id="q_khongmo" value="${esc(f.q||'')}" placeholder="Họ tên, mã ĐT, chẩn đoán…" oninput="setFq('khongmo',this.value)"></div>
+   <div><label>Từ ngày</label><input type="date" value="${f.kfrom||''}" onchange="setKMFrom(this.value)"></div><div><label>Đến ngày</label><input type="date" value="${f.kto||''}" onchange="setF('khongmo','kto',this.value)"></div>
+   <div><label>Hình thức</label><select onchange="setF('khongmo','loai',this.value)"><option value="">Tất cả</option>${KET_THUC.map(x=>`<option${f.loai===x?' selected':''}>${x}</option>`).join('')}</select></div></div>
+   ${f.kfrom&&f.kfrom<cutoff?'<p class="sm amb">Khoảng ngày trước '+vn(cutoff)+': app đã tải thêm dữ liệu cũ từ máy chủ.</p>':''}
+   <div id="L_khongmo"></div></div>`;
+}
+async function setKMFrom(v){
+  F('khongmo').kfrom=v; S.pg.khongmo=0;
+  if(v&&v<addDays(today(),-KEEP_DAYS)){ busy(true); try{ (await L_loadKetThuc(v)).forEach(p=>{ if(!S.bnA[p.id]&&!S.bnB[p.id]) S.bnX[p.id]=p; }); rebuild(); }catch(e){toast(errMsg(e),1)} busy(false); render(); return; }
+  fill('khongmo');
+}
+async function reopenBN(id,btn){
+  const p=S.bn[id]; if(!confirm('Mở lại bệnh nhân '+p.hoTen+'? Bệnh nhân sẽ quay về danh sách chờ.')) return;
+  btn.disabled=true; busy(true);
+  try{ const r=await timed(L_saveBN(p,{ketThuc:''},{})); putLocal(r); toast('Đã mở lại '+p.hoTen); refresh(); }catch(e){ toast(errMsg(e),1); btn.disabled=false; }
+  busy(false);
 }
 function vCho(){ return listCard('cho','Chờ hội chẩn','Bệnh nhân mới vào viện, chưa hội chẩn. Xếp theo ngày vào viện: vào trước ở trên.',['q','vv','buong','bs']); }
 function vTheoDoi(){ return listCard('theodoi','Theo dõi sau hội chẩn – chưa có lịch mổ','Gồm cả bệnh nhân có lịch bị hoãn/hủy. Cập nhật lý do chờ, tiến độ, hoặc lập lịch mổ ngay.',['q','buong','bs','lydo']); }
@@ -748,8 +801,8 @@ function lichRows(){
     return true;
   }).sort((a,b)=>a.ngayMo.localeCompare(b.ngayMo)||kipStr(a).localeCompare(kipStr(b))||byVV(S.bn[a.bnId],S.bn[b.bnId]));
 }
-const LCOLS=[{h:'Mã BA',f:l=>l.maBA?esc(l.maBA):'<span class="amb sm">chưa có</span>'},{h:'Họ và tên',f:l=>nameHTML(S.bn[l.bnId])},{h:'Năm sinh',f:l=>nsHTML(S.bn[l.bnId])},{h:'Vào viện',f:l=>vn(S.bn[l.bnId].ngayVaoVien)},
-  {h:'Chẩn đoán',w:130,f:l=>cdHTML(S.bn[l.bnId])},{h:'Cách thức mổ',w:170,f:l=>esc(l.cachThucMo)+(l.duongMo?` <span class="tag">${esc(l.duongMo)}</span>`:'')},{h:'BS mổ chính',w:150,f:l=>esc(kipStr(l))},{h:'Kíp mê',w:150,f:l=>`<span class="sm">${esc(l.kipMe)}</span>`},{h:'P/S',f:l=>esc(l.loaiMo)},{h:'Ghi chú',f:l=>noteHTML([S.bn[l.bnId].myc,l.ghiChu].filter(Boolean).join(', '))},{h:'Trạng thái',f:l=>lmTag(l)+(l.lyDo?`<div class="sm amb">${esc(l.lyDo)}</div>`:'')}];
+const LCOLS=[{h:'Mã BA',f:l=>l.maBA?esc(l.maBA):'<span class="amb sm">chưa có</span>'},{h:'Họ và tên',f:l=>nameHTML(S.bn[l.bnId])},{h:'Năm sinh',f:l=>nsHTML(S.bn[l.bnId])},
+  {h:'Chẩn đoán',w:130,f:l=>cdHTML(S.bn[l.bnId])},{h:'Cách thức mổ',w:170,f:l=>esc(l.cachThucMo)+(l.duongMo?` <span class="tag">${esc(l.duongMo)}</span>`:'')},{h:'BS mổ chính',w:150,f:l=>esc(kipStr(l))},{h:'Kíp mê',w:110,f:l=>`<span class="sm">${esc(l.kipMe)}</span>`},{h:'P/S',f:l=>esc(l.loaiMo)},{h:'Ghi chú',f:l=>noteHTML([S.bn[l.bnId].myc,l.ghiChu].filter(Boolean).join(', '))},{h:'Trạng thái',f:l=>lmTag(l)+(l.lyDo?`<div class="sm amb">${esc(l.lyDo)}</div>`:'')}];
 function lmActs(l,fromHS){
   if(!can('hc')) return fromHS?'':`<button class="btn sec sm" onclick="openHS('${l.bnId}')">Hồ sơ</button>`;
   const h=fromHS?1:0, b=[];
@@ -758,8 +811,9 @@ function lmActs(l,fromHS){
     if(l.trangThai==='Dự kiến') b.push(`<button class="btn sec sm" onclick="confirmLM('${l.id}',this,${h})">Xác nhận</button>`);
     b.push(`<button class="btn sec sm" onclick="openLM('${l.bnId}','${l.id}',${h})">Sửa/đổi ngày</button>`);
     if(l.ngayMo<=today()) b.push(`<button class="btn sm" onclick="openKQ('${l.id}',${h})">Kết quả</button>`);
-    b.push(`<button class="btn warn sm" onclick="openHoan('${l.id}','Hoãn',${h})">Hoãn</button><button class="btn danger sm" onclick="openHoan('${l.id}','Hủy',${h})">Hủy</button>`);
+    b.push(`<button class="btn warn sm" onclick="openHoan('${l.id}','Hoãn',${h})">Hoãn</button><button class="btn danger sm" onclick="openHoan('${l.id}','Hủy',${h})">Hủy lịch</button>`);
   } else if(can('admin')) b.push(`<button class="btn sec sm" onclick="openLM('${l.bnId}','${l.id}',${h})">Sửa (QTV)</button>`);
+  if(!fromHS) b.push(delBtn(l.bnId));
   return b.join('');
 }
 const fillLichD=debounce(()=>{
@@ -790,7 +844,7 @@ function timRows(){
 }
 const TCOLS=[{h:'Mã BN',f:p=>`<span class="sm mut">${esc(p.id)}</span>`,x:p=>p.id},C.maDT,C.ten,C.ns,C.buong,C.vv,C.cd,C.cdxd,C.bs,{h:'Trạng thái',f:p=>stTag(p.id),x:p=>ST[S.d[p.id].st][0]},
   {h:'Lịch mổ gần nhất',f:p=>{const l=lmOf(p.id)[0]; return l?vn(l.ngayMo)+' '+lmTag(l):''},x:p=>{const l=lmOf(p.id)[0]; return l?vn(l.ngayMo)+' – '+lmLabel(l):''}}];
-function fillTim(){ const el=$('#L_tim'); if(el) el.innerHTML=paged('tim',timRows(),TCOLS,p=>`<button class="btn sec sm" onclick="openHS('${p.id}')">Hồ sơ</button>`); }
+function fillTim(){ const el=$('#L_tim'); if(el) el.innerHTML=paged('tim',timRows(),TCOLS,p=>`<button class="btn sec sm" onclick="openHS('${p.id}')">Hồ sơ</button>`+delBtn(p.id)); }
 const fillTimD=debounce(fillTim,80);
 async function srvSearch(b){
   const q=F('tim').q||''; if(norm(q).length<2) return toast('Nhập ít nhất 2 ký tự để tìm',1);
@@ -851,14 +905,14 @@ function openHS(id){
   const p=S.bn[id]; if(!p) return toast('Không tìm thấy bệnh nhân',1);
   const d=S.d[id], hcs=S.hcBy[id], lms=lmOf(id);
   const sum=`<div class="sum"><b style="font-size:15px">${esc(p.hoTen)}</b> ${p.myc?'<span class="tag myc">MYC</span>':''} ${stTag(id)}<div class="sm" style="margin-top:4px">Mã BN <b>${esc(p.id)}</b> · MÃ ĐT <b>${esc(p.maDT||'–')}</b> · ${esc(p.namSinh)}${tuoi(p.namSinh)?' ('+tuoi(p.namSinh)+' tuổi)':''} · ${esc(p.baoHiem)} · Buồng ${esc(p.buong||'–')} · Vào viện ${p.ngayVaoVien?vn(p.ngayVaoVien)+' ('+ngayNam(p)+' ngày)':'<span class="amb">chưa có</span>'}</div><div class="sm" style="margin-top:4px">CĐ vào viện: ${esc(p.chanDoan||'–')}<br><b>CĐ xác định:</b> ${cdXD(p)?esc(cdXD(p)):'<span class="amb">chưa hội chẩn</span>'}</div></div>`;
-  const td=can('hc')?`<h3 class="gh">Theo dõi</h3><div class="kv"><span class="k">Lý do chờ</span><span>${esc(p.lyDoCho||'–')}</span><span class="k">Tiến độ</span><span>${esc(p.tienDo||'–')}</span><span class="k">Kết thúc điều trị</span><span>${esc(p.ketThuc||'–')}${p.ngayKetThuc?' ('+vn(p.ngayKetThuc)+')':''}</span></div><div class="row" style="margin-top:6px"><button class="btn sec sm" onclick="openTD('${id}',1)">Cập nhật theo dõi</button></div>`:'';
+  const td=can('hc')?`<h3 class="gh">Theo dõi</h3><div class="kv"><span class="k">Lý do chờ</span><span>${esc(p.lyDoCho||'–')}</span><span class="k">Tiến độ</span><span>${esc(p.tienDo||'–')}</span><span class="k">Kết thúc điều trị</span><span>${esc(p.ketThuc||'–')}${p.ngayKetThuc?' ('+vn(p.ngayKetThuc)+')':''}${p.ketThucGhiChu?' – '+esc(p.ketThucGhiChu):''}</span></div><div class="row" style="margin-top:6px"><button class="btn sec sm" onclick="openTD('${id}',1)">Cập nhật theo dõi</button>${p.ketThuc?`<button class="btn sec sm" onclick="closeM();reopenBN('${id}',this)">Mở lại</button>`:`<button class="btn warn sm" onclick="openKT('${id}',1)">Không mổ / ra viện…</button>`}</div>`:'';
   const hcHTML=!hcs?'<p class="mut">Đang tải lịch sử hội chẩn…</p>':hcs.map(h=>`<div class="box"><div class="h"><b>Hội chẩn ${vn(h.ngayHC)}</b><span class="mut sm">ghi bởi ${esc(h.nguoiTao)} lúc ${esc(h.ngayTao)}</span>${can('admin')?`<span style="flex:1"></span><button class="btn danger sm" onclick="delHC('${h.id}','${id}')">Xóa (nhập nhầm)</button>`:''}</div>
     <div class="kv">${[['Chẩn đoán xác định',h.chanDoanXD||h.chanDoan],['Kết luận',h.ketLuan],['Phương án điều trị',h.phuongAnDT],['Phương án PT dự kiến',h.phuongAnPT],['XN / thăm dò bổ sung',h.xnBoSung],['Ý kiến chuyên khoa khác',h.yKienCK],['Công việc tiếp theo',h.congViec?h.congViec+(h.nguoiPhuTrach?' – '+h.nguoiPhuTrach:'')+(h.hanHoanThanh?' – hạn '+vn(h.hanHoanThanh):''):'']].filter(x=>x[1]).map(x=>`<span class="k">${x[0]}</span><span>${esc(x[1])}</span>`).join('')}</div></div>`).join('')||'<p class="mut">Chưa hội chẩn.</p>';
   const lmHTML=lms.map(l=>{const hist=Array.isArray(l.lichSu)?l.lichSu:[];
     return `<div class="box"><div class="h"><b>Mổ ${vn(l.ngayMo)}</b>${lmTag(l)}<span style="flex:1"></span>${lmActs(l,true)}</div>
     <div class="kv">${[['Mã bệnh án',l.maBA||'(chưa có)'],['Cách thức mổ',l.cachThucMo+(l.duongMo?' – '+l.duongMo:'')],['Bác sĩ mổ chính',kipStr(l)],['Kíp mê',l.kipMe],['Mổ phiên / bổ sung',l.loaiMo],['Ghi chú',l.ghiChu],['Lý do hoãn / hủy',l.lyDo],['Ngày thực hiện',l.ngayThucHien?vn(l.ngayThucHien):''],['Kết quả',l.ketQua]].filter(x=>x[1]).map(x=>`<span class="k">${x[0]}</span><span>${esc(x[1])}</span>`).join('')}</div>
     ${hist.length?`<details><summary>Lịch sử thay đổi (${hist.length})</summary><ul class="sm">${hist.map(h=>`<li>${esc(h.t)} – ${esc(h.u)}: ${esc(h.c)}${h.r?' – <i>lý do: '+esc(h.r)+'</i>':''}</li>`).join('')}</ul></details>`:''}</div>`}).join('')||(hcs?'<p class="mut">Chưa có lịch mổ.</p>':'<p class="mut">Đang tải…</p>');
-  const body=sum+`<h3 class="gh">Thông tin hành chính</h3><div id="hsF">${fields(BNF(),p,'hs')}</div><div class="row" style="margin-top:8px"><button class="btn sm" id="hsSave" onclick="saveHS('${id}')">Lưu thông tin hành chính</button><span class="mut sm">Tạo: ${esc(p.nguoiTao)} ${esc(p.ngayTao)} · sửa lần cuối: ${esc(p.nguoiCapNhat)}</span></div>`+td+
+  const body=sum+`<h3 class="gh">Thông tin hành chính</h3><div id="hsF">${fields(BNF(),p,'hs')}</div><div class="row" style="margin-top:8px"><button class="btn sm" id="hsSave" onclick="saveHS('${id}')">Lưu thông tin hành chính</button><span class="mut sm">Tạo: ${esc(p.nguoiTao)} ${esc(p.ngayTao)} · sửa lần cuối: ${esc(p.nguoiCapNhat)}</span><span style="flex:1"></span>${canDel(p)?`<button class="btn danger sm" onclick="openDelBN('${id}')">Xóa bệnh nhân</button>`:''}</div>`+td+
     `<h3 class="gh">Hội chẩn${hcs?' ('+hcs.length+' lần)':''}</h3>${can('hc')?`<button class="btn sm" onclick="openHC('${id}',1)">+ Ghi hội chẩn mới</button>`:''}${hcHTML}`+
     `<h3 class="gh">Lịch mổ (${lms.length})</h3>${can('hc')&&!p.lichHieuLuc&&!p.ketThuc?`<button class="btn sm" onclick="openLM('${id}','',1)">+ Lập lịch mổ</button>`:''}${lmHTML}`;
   const keep=M&&M.hs===id?$('#modal').scrollTop:0;
@@ -906,14 +960,42 @@ function openHC(id,fromHS){
 }
 function openTD(id,fromHS){
   const p=S.bn[id];
-  modal('Cập nhật theo dõi – '+p.hoTen,`<div id="tdF">${fields([{k:'lyDoCho',l:'Lý do chờ mổ',chips:S.dm.lyDoCho||[]},{k:'tienDo',l:'Tiến độ',t:'textarea'},{k:'ketThuc',l:'Kết thúc điều trị tại khoa',t:'select',o:KET_THUC,hint:'Chọn khi bệnh nhân ra viện / chuyển khoa / không phẫu thuật – sẽ rời khỏi các danh sách chờ.'}],p,'td')}</div>`,
+  modal('Cập nhật theo dõi – '+p.hoTen,`<div id="tdF">${fields([{k:'lyDoCho',l:'Lý do chờ mổ',chips:S.dm.lyDoCho||[]},{k:'tienDo',l:'Tiến độ',t:'textarea'}],p,'td')}</div>`,
     {back:fromHS?()=>openHS(id):null,save:async op=>{
       const v=readF('#tdF');
-      if(v.ketThuc&&S.bn[id].lichHieuLuc&&!confirm('Bệnh nhân còn lịch mổ đang hiệu lực. Vẫn kết thúc điều trị? (Nên hoãn/hủy lịch trước)')) return false;
       const r=await L_saveBN(S.bn[id],v,op); putLocal(r); return 'Đã cập nhật';
     }});
 }
 
+function openKT(id,fromHS){
+  const p=S.bn[id], l=p.lichHieuLuc?S.lmMap[p.lichHieuLuc]:null;
+  const body=`<div class="sum"><b>${esc(p.hoTen)}</b> · ${esc(p.namSinh)} · MÃ ĐT ${esc(p.maDT||'–')} · vào viện ${vn(p.ngayVaoVien)||'–'}<br>${cdXD(p)?'<b>CĐ xác định:</b> '+esc(cdXD(p)):'CĐ vào viện: '+esc(p.chanDoan||'–')}</div>
+   <div id="ktF">${fields([{k:'ketThuc',l:'Hình thức',t:'select',o:KET_THUC,req:1},{k:'ngayKetThuc',l:'Ngày',t:'date'},{k:'ketThucGhiChu',l:'Chi tiết: chuyển khoa nào / điều trị gì / lý do',full:1,chips:['Chuyển khoa Xạ trị','Chuyển khoa Nội','Hóa chất tân bổ trợ','Theo dõi ngoại trú','Gia đình xin về','Bệnh lý kèm theo không cho phép mổ']}],{ngayKetThuc:today()},'kt')}</div>
+   ${l?`<div class="warnbox" style="margin-top:8px">Bệnh nhân đang có lịch mổ ngày <b>${vn(l.ngayMo)}</b>. Lịch này sẽ được <b>hủy</b> tự động, lý do ghi theo hình thức ở trên.</div>`:''}
+   <p class="sm mut">Bệnh nhân rời các danh sách chờ, chuyển sang mục <b>Không mổ / Ra viện</b>. Có thể bấm <b>Mở lại</b> sau này.</p>`;
+  modal('Không mổ – kết thúc điều trị tại khoa',body,{back:fromHS?()=>openHS(id):null,saveLabel:'Lưu',save:async op=>{
+    const v=readF('#ktF'); if(!v.ketThuc) throw new Error('Chọn hình thức: ra viện, chuyển khoa, xin về…');
+    if(v.ngayKetThuc&&v.ngayKetThuc>today()) throw new Error('Ngày không được sau hôm nay');
+    let bn=S.bn[id];
+    if(bn.lichHieuLuc){ const cur=S.lmMap[bn.lichHieuLuc]; const r1=await L_saveLM(bn,cur,{trangThai:'Hủy',capNhat:cur.capNhat},'Không mổ – '+v.ketThuc+(v.ketThucGhiChu?': '+v.ketThucGhiChu:''),op.lm||(op.lm={})); putLocal(r1); bn=r1.bn; }
+    const r=await L_saveBN(bn,v,op); putLocal(r); return 'Đã chuyển sang danh sách Không mổ / Ra viện';
+  }});
+}
+function openDelBN(id){
+  const p=S.bn[id]; if(!canDel(p)) return toast('Bệnh nhân đã có hội chẩn hoặc lịch mổ – nhờ người phụ trách hội chẩn xóa',1);
+  const body=`<div class="warnbox"><b>Xóa hẳn bệnh nhân ${esc(p.hoTen)}</b>${p.maDT?' (MÃ ĐT '+esc(p.maDT)+')':''} cùng <b>tất cả hội chẩn và lịch mổ</b> của bệnh nhân này. Không khôi phục được trong app.</div>
+   <p class="sm">Chỉ dùng khi <b>nhập nhầm / trùng bệnh nhân</b>. Bệnh nhân ra viện, chuyển khoa, xin về… thì bấm <b>Không mổ / ra viện</b>, không xóa.</p>
+   <div id="delF">${fields([{k:'reason',l:'Lý do xóa',req:1,chips:['Nhập nhầm bệnh nhân','Trùng bệnh nhân','Nhập thử']}],{},'del')}</div>
+   <label class="row" style="margin-top:8px;color:var(--ink)"><input type="checkbox" class="chk" id="delOK"> Tôi đã kiểm tra, đúng là cần xóa bệnh nhân này</label>`;
+  modal('Xóa bệnh nhân',body,{saveLabel:'Xóa bệnh nhân',save:async()=>{
+    const reason=$('#del_reason').value.trim(); if(!reason) throw new Error('Cần ghi lý do xóa');
+    if(!$('#delOK').checked) throw new Error('Tích ô xác nhận trước khi xóa');
+    const r=await L_deleteBN(S.bn[id],reason);
+    [S.bnA,S.bnB,S.bnX].forEach(m=>delete m[id]); [S.lmA,S.lmB,S.lmX].forEach(m=>Object.keys(m).forEach(k=>{ if(m[k].bnId===id) delete m[k]; })); delete S.hcBy[id]; rebuild();
+    return 'Đã xóa '+p.hoTen+(r.hc||r.lm?' (kèm '+r.hc+' hội chẩn, '+r.lm+' lịch mổ)':'');
+  }});
+  const b=$('#mSave'); if(b) b.className='btn danger';
+}
 /* ---------------- lịch mổ ---------------- */
 const guessDM=s=>!s?'':/robot/i.test(s)?'Robot':/vnotes/i.test(s)?'vNOTES':/PTNS|nội soi|(^|\s)NS(\s|$)/i.test(s)?'NS':'Mổ mở';
 function openLM(bnId,lmId,fromHS){
@@ -992,6 +1074,7 @@ function vNhap(){
    <div class="gridwrap" id="grid"></div>
    <div class="row" style="margin-top:10px"><button class="btn" onclick="checkGrid()">Kiểm tra & xem trước</button><button class="btn sec sm" onclick="addRows(20)">+ 20 dòng</button><button class="btn sec sm" onclick="clearGrid()">Xóa bảng</button><span class="mut sm" id="gridInfo"></span></div></div>
    <div id="impPrev"></div>
+   <div class="card"><div class="row between"><h2>Bệnh nhân nhập trong 7 ngày</h2></div><p class="mut sm" style="margin:4px 0 0">Kiểm tra lại sau khi nhập. Sai thông tin: bấm <b>Hồ sơ / sửa</b>. Nhập nhầm hoặc trùng bệnh nhân: bấm <b>Xóa BN</b>.</p>${fltBar('nhapgan',['q'])}<div id="L_nhapgan"></div></div>
    <div class="card"><h2>Thêm một bệnh nhân</h2><div id="addF">${fields(BNF(),S.addDraft||{ngayVaoVien:today()},'add')}</div><div class="row" style="margin-top:10px"><button class="btn" id="addBtn" onclick="saveAdd()">Lưu bệnh nhân</button></div></div>`;
 }
 function drawGrid(){
